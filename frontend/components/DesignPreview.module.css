@@ -1,0 +1,47 @@
+.previewContainer {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-left: 1px solid #e5e5e5;
+  height: 100vh;
+  width: 400px;
+  overflow: hidden;
+}
+
+.previewHeader {
+  padding: 16px;
+  border-bottom: 1px solid #e5e5e5;
+  background: #fafafa;
+}
+
+.previewHeader h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #333;
+}
+
+.previewFrame {
+  flex: 1;
+  border: none;
+  background: white;
+  padding: 16px;
+  overflow: auto;
+}
+
+@media (max-width: 1024px) {
+  .previewContainer {
+    width: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .previewContainer {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e5e5e5;
+    max-height: 400px;
+  }
+}
