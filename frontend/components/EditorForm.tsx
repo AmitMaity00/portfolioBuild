@@ -16,6 +16,14 @@ export default function EditorForm({ portfolio, setPortfolio, onSave, isSaving }
   const [isPolishingBio, setIsPolishingBio] = useState(false);
   const [polishingProjectIdx, setPolishingProjectIdx] = useState<number | null>(null);
 
+  const API_URL = (import.meta as any).env?.VITE_API_URL;
+  console.log("API URL (Vite pattern):", API_URL);
+  console.log("API URL (Next.js pattern):", process.env.NEXT_PUBLIC_API_URL);
+
+  if (!API_URL && typeof window !== 'undefined') {
+    console.error("VITE_API_URL missing in env");
+  }
+
   const vibe = portfolio.vibe || 'professional';
 
   const handleCopy = (text: string) => {
