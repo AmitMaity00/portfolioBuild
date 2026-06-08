@@ -5,7 +5,8 @@
 import fs from "fs";
 import path from "path";
 
-const DB_FILE = path.join(process.cwd(), ".portfolio_db.json");
+const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
+const DB_FILE = isServerless ? "/tmp/.portfolio_db.json" : path.join(process.cwd(), ".portfolio_db.json");
 
 interface PortfolioRecord {
   user_id: string;
@@ -50,7 +51,11 @@ function readDb(): DbData {
 }
 
 function writeDb(data: DbData): void {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // Vercel/serverless filesystem is read-only; skip write
+  }
 }
 
 export function getPortfolioByUserId(userId: string): PortfolioRecord | null {
