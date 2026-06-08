@@ -1,14 +1,9 @@
 /**
- * localDb.ts — File-based local storage replacing Supabase.
- * Stores all portfolio data in a JSON file on disk so nothing is lost on restart.
+ * Serverless-safe local storage for Vercel.
+ * Uses /tmp on serverless (writable), falls back to in-memory on edge runtime.
  */
-import fs from "fs";
-import path from "path";
 
-const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
-const DB_FILE = isServerless ? "/tmp/.portfolio_db.json" : path.join(process.cwd(), ".portfolio_db.json");
-
-interface PortfolioRecord {
+type PortfolioRecord = {
   user_id: string;
   email: string;
   username: string;
@@ -32,30 +27,70 @@ interface PortfolioRecord {
     connectedAt?: string;
     deployedAt?: string;
   };
+};
+
+type DbData = {
+  portfolios: PortfolioRecord[];
+};
+
+const isServerless = process.env.VERCEL === "1";
+const TMP_PATH = "/tmp/.portfolio_db.json";
+
+let memoryStore: DbData | null = null;
+
+function getStore(): DbData {
+  if (memoryStore) return memoryStore;
+  memoryStore = { portfolios: [] };
+  return memoryStore;
 }
 
-interface DbData {
-  portfolios: PortfolioRecord[];
+function hasFs(): boolean {
+  try {
+    return typeof require !== "undefined" && !!require("fs");
+  } catch {
+    return false;
+  }
+}
+
+function readFromDisk(): DbData | null {
+  if (!hasFs()) return null;
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const dbPath = isServerless ? TMP_PATH : path.join(process.cwd(), ".portfolio_db.json");
+    if (!fs.existsSync(dbPath)) return null;
+    const raw = fs.readFileSync(dbPath, "utf-8");
+    return JSON.parse(raw) as DbData;
+  } catch {
+    return null;
+  }
+}
+
+function writeToDisk(data: DbData): void {
+  if (!hasFs()) return;
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const dbPath = isServerless ? TMP_PATH : path.join(process.cwd(), ".portfolio_db.json");
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf-8");
+    memoryStore = data;
+  } catch {
+    // Silently fail on serverless if disk write fails
+  }
 }
 
 function readDb(): DbData {
-  try {
-    if (!fs.existsSync(DB_FILE)) {
-      return { portfolios: [] };
-    }
-    const raw = fs.readFileSync(DB_FILE, "utf-8");
-    return JSON.parse(raw) as DbData;
-  } catch {
-    return { portfolios: [] };
+  const disk = readFromDisk();
+  if (disk) {
+    memoryStore = disk;
+    return disk;
   }
+  return getStore();
 }
 
 function writeDb(data: DbData): void {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch {
-    // Vercel/serverless filesystem is read-only; skip write
-  }
+  memoryStore = data;
+  writeToDisk(data);
 }
 
 export function getPortfolioByUserId(userId: string): PortfolioRecord | null {
@@ -99,7 +134,6 @@ export function updateGitHub(
   const db = readDb();
   const idx = db.portfolios.findIndex((p) => p.user_id === userId);
   if (idx < 0) {
-    // Create a skeleton entry
     db.portfolios.push({
       user_id: userId,
       email: `${userId}@portfolio.local`,
